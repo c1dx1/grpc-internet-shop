@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package proto;
+
+option go_package = "shared/proto;proto";
+
+service ProductService {
+  rpc GetAllProducts (Empty) returns (ProductListResponse) {}
+  rpc GetProductById (ProductRequest) returns (ProductResponse) {}
+}
+
+message Empty {}
+
+message ProductRequest {
+  int64 id = 1;
+}
+
+message ProductResponse {
+  int64 id = 1;
+  string name = 2;
+  double price = 3;
+  int32 quantity = 4;
+}
+
+message Product {
+  int64 id = 1;
+  string name = 2;
+  double price = 3;
+  int32 quantity = 4;
+}
+
+message ProductListResponse {
+  repeated Product products = 1;
+}

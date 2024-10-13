@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package proto;
+
+option go_package = "shared/proto;proto";
+
+import "shared/proto/product.proto";
+
+service OrderService {
+  rpc CreateOrder (CreateOrderRequest) returns (OrderIDResponse) {}
+  rpc GetOrderById (OrderRequest) returns (OrderResponse) {}
+}
+
+message CreateOrderRequest {
+  repeated proto.Product products = 1;
+  int64 user_id = 2;
+}
+
+message OrderRequest {
+  int64 id = 1;
+}
+
+message OrderIDResponse {
+  int64 order_id = 1;
+}
+
+message OrderResponse {
+  int64 id = 1;
+  int64 user_id = 2;
+  repeated proto.Product product = 3;
+  double total_price = 4;
+}
