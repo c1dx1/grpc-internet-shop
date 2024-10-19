@@ -39,8 +39,6 @@ func main() {
 
 	router := gin.Default()
 
-	router.Use(sessionMiddleware(redisClient))
-
 	productConn, err := grpc.Dial(cfg.LocalhostURL(cfg.ProductPort), grpc.WithInsecure())
 	if err != nil {
 		log.Fatalf("did not connect to Product service: %v", err)
@@ -77,16 +75,16 @@ func main() {
 	router.POST("/user/signup", Handler.SignUpHandler)
 	router.POST("/user/signin", Handler.SignInHandler)
 
-	router.GET("/cart", Handler.GetCartHandler)
-	router.POST("/cart", Handler.AddToCartHandler)
-	router.PUT("/cart", Handler.UpdateCartHandler)
-	router.DELETE("/cart", Handler.RemoveFromCartHandler)
-
 	authGroup := router.Group("/")
 	authGroup.Use(sessionMiddleware(redisClient))
 	{
 		authGroup.POST("/orders", Handler.CreateOrderHandler)
 		authGroup.GET("/orders/:id", Handler.GetOrderByIdHandler)
+
+		router.GET("/cart", Handler.GetCartHandler)
+		router.POST("/cart", Handler.AddToCartHandler)
+		router.PUT("/cart", Handler.UpdateCartHandler)
+		router.DELETE("/cart", Handler.RemoveFromCartHandler)
 
 		authGroup.POST("/user/signout", Handler.SignOutHandler)
 	}
