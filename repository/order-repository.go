@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"internet-shop/shared/models"
 )
@@ -53,7 +54,7 @@ func (r *OrderRepository) CreateOrder(ctx context.Context, order models.Order) (
 	return orderID, nil
 }
 
-func (r *OrderRepository) GetOrderById(ctx context.Context, orderID int64) (models.Order, error) {
+func (r *OrderRepository) GetOrderById(ctx context.Context, ctxUserID int64, orderID int64) (models.Order, error) {
 	conn, err := r.db.Acquire(ctx)
 	if err != nil {
 		return models.Order{}, err
@@ -66,6 +67,10 @@ func (r *OrderRepository) GetOrderById(ctx context.Context, orderID int64) (mode
 		Scan(&order.ID, &order.UserID, &order.TotalPrice)
 	if err != nil {
 		return models.Order{}, err
+	}
+
+	if order.UserID != ctxUserID {
+		return models.Order{}, errors.New("order not found")
 	}
 
 	rows, err := conn.Query(ctx, "SELECT product_id, quantity FROM order_items WHERE order_id = $1", orderID)

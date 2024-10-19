@@ -8,6 +8,7 @@ import (
 	"internet-shop/shared/models"
 	"internet-shop/shared/proto"
 	"log"
+	"strconv"
 )
 
 type OrderHandler struct {
@@ -20,10 +21,9 @@ func NewOrderHandler(repo repository.OrderRepository, rabbitCh *amqp.Channel) *O
 	return &OrderHandler{repo: repo, rabbitCh: rabbitCh}
 }
 
-func (h *OrderHandler) CreateOrder(ctx context.Context, req *proto.CreateOrderRequest) (*proto.OrderIDResponse, error) {
+func (h *OrderHandler) CreateOrder(ctx context.Context, req *proto.CreateOrderRequest) (*proto.CreateOrderResponse, error) {
 	var products []models.Product
 	var total float64
-
 	for _, p := range req.Products {
 		product := models.Product{
 			ID:       p.Id,
@@ -35,8 +35,14 @@ func (h *OrderHandler) CreateOrder(ctx context.Context, req *proto.CreateOrderRe
 		total += p.Price * float64(p.Quantity)
 	}
 
+	userID, err := strconv.ParseInt(ctx.Value("user-id").(string), 10, 64)
+	if err != nil {
+		log.Printf("order_handler: createorder: strconv userid error: err:%v", err)
+		return nil, err
+	}
+
 	order := models.Order{
-		UserID:     req.UserId,
+		UserID:     userID,
 		Products:   products,
 		TotalPrice: total,
 	}
@@ -49,7 +55,7 @@ func (h *OrderHandler) CreateOrder(ctx context.Context, req *proto.CreateOrderRe
 	message := map[string]interface{}{
 		"order_id": orderId,
 		"products": products,
-		"user_id":  req.UserId,
+		"user_id":  userID,
 		"total":    total,
 	}
 
@@ -69,13 +75,19 @@ func (h *OrderHandler) CreateOrder(ctx context.Context, req *proto.CreateOrderRe
 		log.Printf("Error publishing message: %s", err)
 	}
 
-	return &proto.OrderIDResponse{
+	return &proto.CreateOrderResponse{
 		OrderId: orderId,
 	}, nil
 }
 
 func (h *OrderHandler) GetOrderById(ctx context.Context, req *proto.OrderRequest) (*proto.OrderResponse, error) {
-	order, err := h.repo.GetOrderById(ctx, req.Id)
+	userID, err := strconv.ParseInt(ctx.Value("user-id").(string), 10, 64)
+	if err != nil {
+		log.Printf("order_handler: getorder: strconv userid error: err:%v", err)
+		return nil, err
+	}
+
+	order, err := h.repo.GetOrderById(ctx, userID, req.Id)
 	if err != nil {
 		return nil, err
 	}

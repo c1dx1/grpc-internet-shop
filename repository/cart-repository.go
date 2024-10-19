@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"internet-shop/shared/models"
 )
@@ -11,8 +12,16 @@ type CartRepository struct {
 	productRepo *ProductRepository
 }
 
+type CartRepositoryOutside struct {
+	db *pgxpool.Pool
+}
+
 func NewCartRepository(db *pgxpool.Pool, productRepo *ProductRepository) *CartRepository {
 	return &CartRepository{db: db, productRepo: productRepo}
+}
+
+func NewCartRepositoryOutside(db *pgxpool.Pool) *CartRepositoryOutside {
+	return &CartRepositoryOutside{db: db}
 }
 
 func (r *CartRepository) GetCart(ctx context.Context, userId int64) (models.Cart, error) {
@@ -151,5 +160,27 @@ func (r *CartRepository) UpdateTotalPrice(ctx context.Context, userId int64) err
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func (r *CartRepositoryOutside) CreateCart(ctx context.Context, userID int64) error {
+	conn, err := r.db.Acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Release()
+
+	var flag bool
+
+	err = conn.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM carts WHERE user_id=$1)", userID).Scan(&flag)
+	if flag {
+		return fmt.Errorf("Cart is alredy exists for this userid")
+	}
+
+	_, err = conn.Exec(ctx, "INSERT INTO carts (user_id, total_price) VALUES ($1, $2)", userID, 0)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }

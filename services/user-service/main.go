@@ -7,16 +7,13 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"internet-shop/repository"
-	"internet-shop/services/order-service/handlers"
+	"internet-shop/services/user-service/handlers"
 	"internet-shop/services/user-service/interceptors"
 	"internet-shop/shared/config"
-	"internet-shop/shared/messaging"
 	"internet-shop/shared/proto"
 	"log"
 	"net"
 )
-
-const orderQueue = "order_queue"
 
 func NewDBPool(connString string) (*pgxpool.Pool, error) {
 	pool, err := pgxpool.Connect(context.Background(), connString)
@@ -44,51 +41,36 @@ func NewRedisClient(cfg *config.Config) (*redis.Client, error) {
 func main() {
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		log.Fatalf("Error loading config: %s", err)
+		log.Fatalf("cannot load config file: %v", err)
 	}
 
 	pool, err := NewDBPool(cfg.PostgresURL())
 	if err != nil {
-		log.Fatalf("Error connecting to database: %s", err)
+		log.Fatalf("cannot connect to database: %v", err)
 	}
 	defer pool.Close()
 
-	rabbitConn, err := messaging.NewRabbitMQConnections(cfg.RabbitMQURL)
-	if err != nil {
-		log.Fatalf("Error connecting to rabbitmq: %s", err)
-	}
-	defer rabbitConn.Close()
-
-	rabbitCh, err := messaging.NewRabbitMQChannels(rabbitConn)
-	if err != nil {
-		log.Fatalf("Error creating rabbitmq channel: %s", err)
-	}
-	defer rabbitCh.Close()
-
-	_, err = messaging.DeclareQueue(rabbitCh, orderQueue)
-	if err != nil {
-		log.Fatalf("Error declaring order_queue: %s", err)
-	}
-
 	redisClient, err := NewRedisClient(cfg)
 	if err != nil {
-		log.Fatalf("Error connecting to redis: %s", err)
+		log.Fatalf("cannot connect to redis: %v", err)
 	}
+	defer redisClient.Close()
 
-	orderRepo := repository.NewOrderRepository(pool)
-	orderHandler := handlers.NewOrderHandler(*orderRepo, rabbitCh)
+	userRepo := repository.NewUserRepository(pool)
+	userHandler := handlers.NewUserHandler(*userRepo, redisClient)
 
 	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(interceptors.SessionAuthInterceptor(redisClient)))
-	proto.RegisterOrderServiceServer(grpcServer, orderHandler)
+	proto.RegisterUserServiceServer(grpcServer, userHandler)
 
 	reflection.Register(grpcServer)
 
-	listener, err := net.Listen(cfg.ServicesNetworkType, cfg.OrderPort)
+	listener, err := net.Listen(cfg.ServicesNetworkType, cfg.UserPort)
 	if err != nil {
-		log.Fatalf("Error listening on port %s", cfg.OrderPort)
+		log.Fatalf("failed to listen: %v", err)
 	}
-	log.Printf("Order service listening on port %s", cfg.OrderPort)
+
+	log.Printf("User service started on port %s", cfg.UserPort)
 	if err := grpcServer.Serve(listener); err != nil {
-		log.Fatalf("Error starting grpc server: %s", err)
+		log.Fatalf("failed to serve: %v", err)
 	}
 }

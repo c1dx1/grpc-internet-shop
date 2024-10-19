@@ -66,11 +66,11 @@ func main() {
 
 	go consumeOrderMessage(*productRepo, rabbitCh)
 
-	listener, err := net.Listen("tcp", ":50051")
+	listener, err := net.Listen(cfg.ServicesNetworkType, cfg.ProductPort)
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
 	}
-	log.Println("Product service started on :50051")
+	log.Printf("Product service started on %s", cfg.ProductPort)
 	if err := grpcServer.Serve(listener); err != nil {
 		log.Fatalf("Failed to serve: %v", err)
 	}

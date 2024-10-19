@@ -7,20 +7,19 @@ option go_package = "shared/proto;proto";
 import "shared/proto/product.proto";
 
 service OrderService {
-  rpc CreateOrder (CreateOrderRequest) returns (OrderIDResponse) {}
+  rpc CreateOrder (CreateOrderRequest) returns (CreateOrderResponse) {}
   rpc GetOrderById (OrderRequest) returns (OrderResponse) {}
 }
 
 message CreateOrderRequest {
   repeated proto.Product products = 1;
-  int64 user_id = 2;
 }
 
 message OrderRequest {
   int64 id = 1;
 }
 
-message OrderIDResponse {
+message CreateOrderResponse {
   int64 order_id = 1;
 }
 
