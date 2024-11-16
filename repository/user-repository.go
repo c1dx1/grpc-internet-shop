@@ -9,12 +9,11 @@ import (
 )
 
 type UserRepository struct {
-	db       *pgxpool.Pool
-	cartRepo *CartRepositoryOutside
+	db *pgxpool.Pool
 }
 
 func NewUserRepository(db *pgxpool.Pool) *UserRepository {
-	return &UserRepository{db: db, cartRepo: NewCartRepositoryOutside(db)}
+	return &UserRepository{db: db}
 }
 
 func (r *UserRepository) SignInUser(ctx context.Context, email, password string) (int64, error) {
@@ -58,10 +57,22 @@ func (r *UserRepository) SignUpUser(ctx context.Context, email, password string)
 		return 0, err
 	}
 
-	err = r.cartRepo.CreateCart(ctx, userID)
+	return userID, nil
+}
+
+func (r *UserRepository) GetEmailById(ctx context.Context, userID int64) (string, error) {
+	conn, err := r.db.Acquire(ctx)
 	if err != nil {
-		return 0, err
+		return "", err
+	}
+	defer conn.Release()
+
+	var email string
+
+	err = conn.QueryRow(ctx, "SELECT email FROM users WHERE id=$1", userID).Scan(&email)
+	if err != nil {
+		return "", err
 	}
 
-	return userID, nil
+	return email, nil
 }

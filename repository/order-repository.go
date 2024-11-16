@@ -5,15 +5,15 @@ import (
 	"errors"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"internet-shop/shared/models"
+	"internet-shop/shared/proto"
 )
 
 type OrderRepository struct {
-	db          *pgxpool.Pool
-	productRepo *ProductRepository
+	db *pgxpool.Pool
 }
 
 func NewOrderRepository(db *pgxpool.Pool) *OrderRepository {
-	return &OrderRepository{db: db, productRepo: NewProductRepository(db)}
+	return &OrderRepository{db: db}
 }
 
 func (r *OrderRepository) CreateOrder(ctx context.Context, order models.Order) (int64, error) {
@@ -54,7 +54,7 @@ func (r *OrderRepository) CreateOrder(ctx context.Context, order models.Order) (
 	return orderID, nil
 }
 
-func (r *OrderRepository) GetOrderById(ctx context.Context, ctxUserID int64, orderID int64) (models.Order, error) {
+func (r *OrderRepository) GetOrderByID(ctx context.Context, ctxUserID int64, orderID int64, productClient proto.ProductServiceClient) (models.Order, error) {
 	conn, err := r.db.Acquire(ctx)
 	if err != nil {
 		return models.Order{}, err
@@ -88,7 +88,7 @@ func (r *OrderRepository) GetOrderById(ctx context.Context, ctxUserID int64, ord
 			return models.Order{}, err
 		}
 
-		product, err := r.productRepo.GetProductById(ctx, p.ID)
+		product, err := productClient.GetProductById(ctx, &proto.ProductRequest{Id: p.ID})
 		if err != nil {
 			return models.Order{}, err
 		}
@@ -101,4 +101,13 @@ func (r *OrderRepository) GetOrderById(ctx context.Context, ctxUserID int64, ord
 	order.Products = products
 
 	return order, nil
+}
+
+func (r *OrderRepository) GetEmailByID(ctx context.Context, userID int64, userService proto.UserServiceClient) (string, error) {
+	resp, err := userService.GetEmailById(ctx, &proto.IdRequest{Id: userID})
+	if err != nil {
+		return "", err
+	}
+
+	return resp.Email, nil
 }

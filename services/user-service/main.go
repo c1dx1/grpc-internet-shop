@@ -10,10 +10,13 @@ import (
 	"internet-shop/services/user-service/handlers"
 	"internet-shop/services/user-service/interceptors"
 	"internet-shop/shared/config"
+	"internet-shop/shared/messaging"
 	"internet-shop/shared/proto"
 	"log"
 	"net"
 )
+
+const userQueue = "user_queue"
 
 func NewDBPool(connString string) (*pgxpool.Pool, error) {
 	pool, err := pgxpool.Connect(context.Background(), connString)
@@ -50,6 +53,23 @@ func main() {
 	}
 	defer pool.Close()
 
+	rabbitConn, err := messaging.NewRabbitMQConnections(cfg.RabbitMQURL)
+	if err != nil {
+		log.Fatalf("Error connecting to rabbitmq: %s", err)
+	}
+	defer rabbitConn.Close()
+
+	rabbitCh, err := messaging.NewRabbitMQChannels(rabbitConn)
+	if err != nil {
+		log.Fatalf("Error creating rabbitmq channel: %s", err)
+	}
+	defer rabbitCh.Close()
+
+	_, err = messaging.DeclareQueue(rabbitCh, userQueue)
+	if err != nil {
+		log.Fatalf("Error declaring order_queue: %s", err)
+	}
+
 	redisClient, err := NewRedisClient(cfg)
 	if err != nil {
 		log.Fatalf("cannot connect to redis: %v", err)
@@ -57,7 +77,7 @@ func main() {
 	defer redisClient.Close()
 
 	userRepo := repository.NewUserRepository(pool)
-	userHandler := handlers.NewUserHandler(*userRepo, redisClient)
+	userHandler := handlers.NewUserHandler(*userRepo, rabbitCh, redisClient)
 
 	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(interceptors.SessionAuthInterceptor(redisClient)))
 	proto.RegisterUserServiceServer(grpcServer, userHandler)

@@ -8,6 +8,7 @@ service UserService {
   rpc SignInUser (SignInRequest) returns (SignInResponse) {}
   rpc SignUpUser (SignUpRequest) returns (SignInResponse) {}
   rpc SignOutUser (SignOutRequest) returns (SignOutResponse) {}
+  rpc GetEmailById (IdRequest) returns (EmailResponse) {}
 }
 
 message SignInRequest {
@@ -31,4 +32,12 @@ message SignInResponse {
 
 message SignOutResponse {
   bool success = 1;
+}
+
+message IdRequest {
+  int64 id = 1;
+}
+
+message EmailResponse {
+  string email = 1;
 }

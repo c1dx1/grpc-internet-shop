@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"github.com/redis/go-redis/v9"
+	"github.com/streadway/amqp"
 	"golang.org/x/crypto/bcrypt"
 	"internet-shop/repository"
 	"internet-shop/services/user-service/sessions"
@@ -13,12 +15,13 @@ import (
 
 type UserHandler struct {
 	repo        repository.UserRepository
+	rabbitCh    *amqp.Channel
 	redisClient *redis.Client
 	proto.UnimplementedUserServiceServer
 }
 
-func NewUserHandler(repo repository.UserRepository, redisClient *redis.Client) *UserHandler {
-	return &UserHandler{repo: repo, redisClient: redisClient}
+func NewUserHandler(repo repository.UserRepository, rabbitCh *amqp.Channel, redisClient *redis.Client) *UserHandler {
+	return &UserHandler{repo: repo, rabbitCh: rabbitCh, redisClient: redisClient}
 }
 
 func (h *UserHandler) SignInUser(ctx context.Context, req *proto.SignInRequest) (*proto.SignInResponse, error) {
@@ -60,6 +63,22 @@ func (h *UserHandler) SignUpUser(ctx context.Context, req *proto.SignUpRequest) 
 		return nil, err
 	}
 
+	message := map[string]interface{}{
+		"user_id": userID,
+	}
+
+	messageBody, _ := json.Marshal(message)
+
+	err = h.rabbitCh.Publish(
+		"",
+		"user_queue",
+		false,
+		false,
+		amqp.Publishing{
+			ContentType: "application/json",
+			Body:        messageBody,
+		})
+
 	return &proto.SignInResponse{SessionId: sessionID}, nil
 }
 
@@ -71,4 +90,13 @@ func (h *UserHandler) SignOutUser(ctx context.Context, req *proto.SignOutRequest
 	}
 
 	return &proto.SignOutResponse{Success: true}, nil
+}
+
+func (h *UserHandler) GetEmailById(ctx context.Context, req *proto.IdRequest) (*proto.EmailResponse, error) {
+	email, err := h.repo.GetEmailById(ctx, req.Id)
+	if err != nil {
+		log.Printf("user_handler: get email by id %s error %v", req.Id, err)
+		return nil, err
+	}
+	return &proto.EmailResponse{Email: email}, nil
 }

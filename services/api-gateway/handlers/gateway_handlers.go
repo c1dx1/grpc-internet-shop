@@ -16,14 +16,14 @@ type Handlers struct {
 }
 
 func NewHandler(
-	orderClient proto.OrderServiceClient,
 	productClient proto.ProductServiceClient,
+	orderClient proto.OrderServiceClient,
 	cartClient proto.CartServiceClient,
 	userClient proto.UserServiceClient) *Handlers {
 
 	return &Handlers{
-		orderClient:   orderClient,
 		productClient: productClient,
+		orderClient:   orderClient,
 		cartClient:    cartClient,
 		userClient:    userClient,
 	}
@@ -32,7 +32,7 @@ func NewHandler(
 func (h *Handlers) AllProductsHandler(c *gin.Context) {
 	products, err := h.productClient.GetAllProducts(context.Background(), &proto.Empty{})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"gw_handlers: allproducts: repo error": err.Error()})
 		return
 	}
 
@@ -42,13 +42,13 @@ func (h *Handlers) AllProductsHandler(c *gin.Context) {
 func (h *Handlers) GetProductByIDHandler(c *gin.Context) {
 	productID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"gw_handlers: getproductbyid: strconv error": err.Error()})
 		return
 	}
 
 	product, err := h.productClient.GetProductById(context.Background(), &proto.ProductRequest{Id: productID})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"gw_handlers: getproductbyid: repo error": err.Error()})
 		return
 	}
 
@@ -64,7 +64,7 @@ func (h *Handlers) CreateOrderHandler(c *gin.Context) {
 
 	order, err := h.orderClient.CreateOrder(c.Request.Context(), &createOrderRequest)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"gw_handlers: createorder: repo error": err.Error()})
 		return
 	}
 
@@ -80,7 +80,7 @@ func (h *Handlers) GetOrderByIdHandler(c *gin.Context) {
 
 	order, err := h.orderClient.GetOrderById(c.Request.Context(), &proto.OrderRequest{Id: orderID})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"gw_handlers: getorderbyid: repo error": err.Error()})
 		return
 	}
 
@@ -90,7 +90,7 @@ func (h *Handlers) GetOrderByIdHandler(c *gin.Context) {
 func (h *Handlers) GetCartHandler(c *gin.Context) {
 	cart, err := h.cartClient.GetCart(c.Request.Context(), &proto.EmptyCartRequest{})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"gw_handlers: getcart: repo error": err.Error()})
 		return
 	}
 
@@ -106,7 +106,7 @@ func (h *Handlers) AddToCartHandler(c *gin.Context) {
 
 	_, err := h.cartClient.AddToCart(c.Request.Context(), &cartRequest)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"gw_handlers: addtocart: repo error": err.Error()})
 		return
 	}
 
@@ -121,7 +121,7 @@ func (h *Handlers) RemoveFromCartHandler(c *gin.Context) {
 
 	cart, err := h.cartClient.RemoveFromCart(c.Request.Context(), &cartRequest)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"gw_handlers: removefromcart: repo error": err.Error()})
 		return
 	}
 
@@ -137,7 +137,7 @@ func (h *Handlers) UpdateCartHandler(c *gin.Context) {
 
 	cart, err := h.cartClient.UpdateCart(c.Request.Context(), &cartRequest)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"gw_handlers: updatecart: repo error": err.Error()})
 		return
 	}
 
@@ -153,7 +153,7 @@ func (h *Handlers) SignUpHandler(c *gin.Context) {
 
 	sessionID, err := h.userClient.SignUpUser(context.Background(), &signUpRequest)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"gw_handlers: signup: repo error": err.Error()})
 		return
 	}
 
@@ -169,7 +169,7 @@ func (h *Handlers) SignInHandler(c *gin.Context) {
 
 	sessionID, err := h.userClient.SignInUser(context.Background(), &signInRequest)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"gw_handlers: signin: repo error": err.Error()})
 		return
 	}
 
@@ -185,7 +185,7 @@ func (h *Handlers) SignOutHandler(c *gin.Context) {
 
 	success, err := h.userClient.SignOutUser(c.Request.Context(), &signOutRequest)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"gw_handlers: signnout: repo error": err.Error()})
 		return
 	}
 

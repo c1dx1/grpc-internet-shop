@@ -8,7 +8,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"internet-shop/repository"
-	"internet-shop/services/cart-service/handlers"
+	"internet-shop/services/notification-service/handlers"
+	email "internet-shop/services/notification-service/senders"
 	"internet-shop/services/user-service/interceptors"
 	"internet-shop/shared/config"
 	"internet-shop/shared/proto"
@@ -22,21 +23,6 @@ func NewDBPool(connString string) (*pgxpool.Pool, error) {
 		return nil, err
 	}
 	return pool, nil
-}
-
-func NewRedisClient(cfg *config.Config) (*redis.Client, error) {
-	rdb := redis.NewClient(&redis.Options{
-		Addr:     cfg.RedisURL,
-		Password: cfg.RedisPassword,
-		DB:       cfg.RedisDB,
-	})
-
-	_, err := rdb.Ping(context.Background()).Result()
-	if err != nil {
-		return nil, err
-	}
-
-	return rdb, nil
 }
 
 func NewRabbitMQChannel(rabbitURL string) (*amqp.Connection, *amqp.Channel, error) {
@@ -54,10 +40,25 @@ func NewRabbitMQChannel(rabbitURL string) (*amqp.Connection, *amqp.Channel, erro
 	return conn, ch, nil
 }
 
+func NewRedisClient(cfg *config.Config) (*redis.Client, error) {
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     cfg.RedisURL,
+		Password: cfg.RedisPassword,
+		DB:       cfg.RedisDB,
+	})
+
+	_, err := rdb.Ping(context.Background()).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	return rdb, nil
+}
+
 func main() {
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		log.Fatalf("Error loading config: %s", err)
+		log.Fatalf("Failed to load config: %v", err)
 	}
 
 	pool, err := NewDBPool(cfg.PostgresURL())
@@ -68,7 +69,7 @@ func main() {
 
 	rabbitConn, rabbitCh, err := NewRabbitMQChannel(cfg.RabbitMQURL)
 	if err != nil {
-		log.Fatalf("Error connecting to rabbitMQ: %s", err)
+		log.Fatalf("Error connecting to RabbitMQ: %s", err)
 	}
 	defer rabbitConn.Close()
 	defer rabbitCh.Close()
@@ -78,22 +79,24 @@ func main() {
 		log.Fatalf("Error connecting to redis: %s", err)
 	}
 
-	cartRepo := repository.NewCartRepository(pool)
-	cartHandler := handlers.NewCartHandler(*cartRepo)
+	eSend := email.NewEmailSender(cfg.SMTPFrom, cfg.SMTPUsername, cfg.SMTPPass, cfg.SMTPHost, cfg.SMTPPort)
+
+	notificationRepo := repository.NewNotificationRepository(pool)
+	notificationHandler := handlers.NewNotificationHandler(*notificationRepo)
 
 	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(interceptors.SessionAuthInterceptor(redisClient)))
-	proto.RegisterCartServiceServer(grpcServer, cartHandler)
+	proto.RegisterNotificationServiceServer(grpcServer, notificationHandler)
 
 	reflection.Register(grpcServer)
 
-	go consumeUserMessage(*cartRepo, rabbitCh)
+	go consumeNotificationMessage(*eSend, *notificationHandler, rabbitCh)
 
-	listener, err := net.Listen(cfg.ServicesNetworkType, cfg.CartPort)
+	listener, err := net.Listen(cfg.ServicesNetworkType, cfg.NotificationPort)
 	if err != nil {
-		log.Fatalf("Error listening on port %s", cfg.CartPort)
+		log.Fatalf("Failed to listen: %v", err)
 	}
-	log.Printf("Order service listening on port %s", cfg.CartPort)
+	log.Printf("Notification service started on %s", cfg.NotificationPort)
 	if err := grpcServer.Serve(listener); err != nil {
-		log.Fatalf("Error starting grpc server: %s", err)
+		log.Fatalf("Failed to serve: %v", err)
 	}
 }

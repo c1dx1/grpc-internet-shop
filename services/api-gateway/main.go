@@ -5,7 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
-	"internet-shop/services/gateway-service/handlers"
+	"internet-shop/services/api-gateway/handlers"
 	"internet-shop/shared/config"
 	"internet-shop/shared/proto"
 	"log"
@@ -39,8 +39,6 @@ func main() {
 
 	router := gin.Default()
 
-	router.Use(sessionMiddleware(redisClient))
-
 	productConn, err := grpc.Dial(cfg.LocalhostURL(cfg.ProductPort), grpc.WithInsecure())
 	if err != nil {
 		log.Fatalf("did not connect to Product service: %v", err)
@@ -69,18 +67,13 @@ func main() {
 	defer userConn.Close()
 	userClient := proto.NewUserServiceClient(userConn)
 
-	Handler := handlers.NewHandler(orderClient, productClient, cartClient, userClient)
+	Handler := handlers.NewHandler(productClient, orderClient, cartClient, userClient)
 
 	router.GET("/products", Handler.AllProductsHandler)
 	router.GET("/products/:id", Handler.GetProductByIDHandler)
 
-	router.POST("/user/signup", Handler.SignUpHandler)
-	router.POST("/user/signin", Handler.SignInHandler)
-
-	router.GET("/cart", Handler.GetCartHandler)
-	router.POST("/cart", Handler.AddToCartHandler)
-	router.PUT("/cart", Handler.UpdateCartHandler)
-	router.DELETE("/cart", Handler.RemoveFromCartHandler)
+	router.POST("/signin", Handler.SignInHandler)
+	router.POST("/signup", Handler.SignUpHandler)
 
 	authGroup := router.Group("/")
 	authGroup.Use(sessionMiddleware(redisClient))
@@ -88,7 +81,12 @@ func main() {
 		authGroup.POST("/orders", Handler.CreateOrderHandler)
 		authGroup.GET("/orders/:id", Handler.GetOrderByIdHandler)
 
-		authGroup.POST("/user/signout", Handler.SignOutHandler)
+		authGroup.GET("/cart", Handler.GetCartHandler)
+		authGroup.POST("/cart", Handler.AddToCartHandler)
+		authGroup.PUT("/cart", Handler.UpdateCartHandler)
+		authGroup.DELETE("/cart", Handler.RemoveFromCartHandler)
+
+		authGroup.POST("/signout", Handler.SignOutHandler)
 	}
 
 	log.Printf("Gateway service is listening on port %s", cfg.GatewayPort)

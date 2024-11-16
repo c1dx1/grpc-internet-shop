@@ -9,7 +9,7 @@ import (
 
 func consumeOrderMessage(repo repository.ProductRepository, ch *amqp.Channel) {
 	message, err := ch.Consume(
-		"order_queue",
+		"product_quantity_after_order",
 		"",
 		true,
 		false,

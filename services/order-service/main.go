@@ -16,7 +16,8 @@ import (
 	"net"
 )
 
-const orderQueue = "order_queue"
+const productQuantityAfterOrderQueue = "product_quantity_after_order"
+const notificationAfterOrderQueue = "notification_after_order"
 
 func NewDBPool(connString string) (*pgxpool.Pool, error) {
 	pool, err := pgxpool.Connect(context.Background(), connString)
@@ -65,9 +66,14 @@ func main() {
 	}
 	defer rabbitCh.Close()
 
-	_, err = messaging.DeclareQueue(rabbitCh, orderQueue)
+	_, err = messaging.DeclareQueue(rabbitCh, productQuantityAfterOrderQueue)
 	if err != nil {
-		log.Fatalf("Error declaring order_queue: %s", err)
+		log.Fatalf("Error declaring product_quantity_after_order: %s", err)
+	}
+
+	_, err = messaging.DeclareQueue(rabbitCh, notificationAfterOrderQueue)
+	if err != nil {
+		log.Fatalf("Error declaring notification_after_order: %s", err)
 	}
 
 	redisClient, err := NewRedisClient(cfg)

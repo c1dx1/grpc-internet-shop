@@ -5,26 +5,18 @@ import (
 	"fmt"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"internet-shop/shared/models"
+	"internet-shop/shared/proto"
 )
 
 type CartRepository struct {
-	db          *pgxpool.Pool
-	productRepo *ProductRepository
-}
-
-type CartRepositoryOutside struct {
 	db *pgxpool.Pool
 }
 
-func NewCartRepository(db *pgxpool.Pool, productRepo *ProductRepository) *CartRepository {
-	return &CartRepository{db: db, productRepo: productRepo}
+func NewCartRepository(db *pgxpool.Pool) *CartRepository {
+	return &CartRepository{db: db}
 }
 
-func NewCartRepositoryOutside(db *pgxpool.Pool) *CartRepositoryOutside {
-	return &CartRepositoryOutside{db: db}
-}
-
-func (r *CartRepository) GetCart(ctx context.Context, userId int64) (models.Cart, error) {
+func (r *CartRepository) GetCart(ctx context.Context, userId int64, productService proto.ProductServiceClient) (models.Cart, error) {
 	conn, err := r.db.Acquire(ctx)
 	if err != nil {
 		return models.Cart{}, err
@@ -55,7 +47,7 @@ func (r *CartRepository) GetCart(ctx context.Context, userId int64) (models.Cart
 			return models.Cart{}, err
 		}
 
-		pDB, err := r.productRepo.GetProductById(ctx, product.ID)
+		pDB, err := productService.GetProductById(ctx, &proto.ProductRequest{Id: product.ID})
 		if err != nil {
 			return models.Cart{}, err
 		}
@@ -83,11 +75,6 @@ func (r *CartRepository) AddToCart(ctx context.Context, userId int64, productId 
 		return err
 	}
 
-	err = r.UpdateTotalPrice(ctx, userId)
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -99,8 +86,6 @@ func (r *CartRepository) RemoveFromCart(ctx context.Context, userId int64, produ
 	defer conn.Release()
 
 	_, err = conn.Exec(ctx, "DELETE FROM cart_items WHERE user_id = $1 AND product_id = $2", userId, productId)
-
-	err = r.UpdateTotalPrice(ctx, userId)
 	if err != nil {
 		return err
 	}
@@ -119,16 +104,10 @@ func (r *CartRepository) UpdateCart(ctx context.Context, userId int64, productId
 	if err != nil {
 		return err
 	}
-
-	err = r.UpdateTotalPrice(ctx, userId)
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
-func (r *CartRepository) UpdateTotalPrice(ctx context.Context, userId int64) error {
+func (r *CartRepository) UpdateTotalPrice(ctx context.Context, userId int64, productClient proto.ProductServiceClient) error {
 	conn, err := r.db.Acquire(ctx)
 	if err != nil {
 		return err
@@ -146,7 +125,7 @@ func (r *CartRepository) UpdateTotalPrice(ctx context.Context, userId int64) err
 		var product models.Product
 		err = rows.Scan(&product.ID, &product.Quantity)
 
-		pDB, err := r.productRepo.GetProductById(ctx, product.ID)
+		pDB, err := productClient.GetProductById(ctx, &proto.ProductRequest{Id: product.ID})
 		if err != nil {
 			return err
 		}
@@ -163,7 +142,7 @@ func (r *CartRepository) UpdateTotalPrice(ctx context.Context, userId int64) err
 	return nil
 }
 
-func (r *CartRepositoryOutside) CreateCart(ctx context.Context, userID int64) error {
+func (r *CartRepository) CreateCart(ctx context.Context, userID int64) error {
 	conn, err := r.db.Acquire(ctx)
 	if err != nil {
 		return err

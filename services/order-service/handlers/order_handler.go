@@ -3,8 +3,12 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/streadway/amqp"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"internet-shop/repository"
+	"internet-shop/shared/config"
 	"internet-shop/shared/models"
 	"internet-shop/shared/proto"
 	"log"
@@ -19,6 +23,21 @@ type OrderHandler struct {
 
 func NewOrderHandler(repo repository.OrderRepository, rabbitCh *amqp.Channel) *OrderHandler {
 	return &OrderHandler{repo: repo, rabbitCh: rabbitCh}
+}
+
+func NewProductConnection() (*grpc.ClientConn, error) {
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		log.Fatalf("order_handler: newpc: Error loading config: %s", err)
+		return nil, err
+	}
+	conn, err := grpc.NewClient(fmt.Sprintf("localhost%s", cfg.ProductPort), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("Error connecting to server: %s", err)
+		return nil, err
+	}
+
+	return conn, nil
 }
 
 func (h *OrderHandler) CreateOrder(ctx context.Context, req *proto.CreateOrderRequest) (*proto.CreateOrderResponse, error) {
@@ -47,36 +66,25 @@ func (h *OrderHandler) CreateOrder(ctx context.Context, req *proto.CreateOrderRe
 		TotalPrice: total,
 	}
 
-	orderId, err := h.repo.CreateOrder(ctx, order)
+	orderID, err := h.repo.CreateOrder(ctx, order)
 	if err != nil {
 		return nil, err
 	}
 
-	message := map[string]interface{}{
-		"order_id": orderId,
-		"products": products,
-		"user_id":  userID,
-		"total":    total,
+	err = h.UpdateQuantityMessage(products)
+	if err != nil {
+		log.Printf("order_handler: updateQuantity error: err:%v", err)
+		return nil, err
 	}
 
-	messageBody, _ := json.Marshal(message)
-
-	err = h.rabbitCh.Publish(
-		"",
-		"order_queue",
-		false,
-		false,
-		amqp.Publishing{
-			ContentType: "application/json",
-			Body:        messageBody,
-		})
-
+	err = h.SendNotification(userID, orderID)
 	if err != nil {
-		log.Printf("Error publishing message: %s", err)
+		log.Printf("order_handler: sendnotif error: err:%v", err)
+		return nil, err
 	}
 
 	return &proto.CreateOrderResponse{
-		OrderId: orderId,
+		OrderId: orderID,
 	}, nil
 }
 
@@ -87,7 +95,17 @@ func (h *OrderHandler) GetOrderById(ctx context.Context, req *proto.OrderRequest
 		return nil, err
 	}
 
-	order, err := h.repo.GetOrderById(ctx, userID, req.Id)
+	productConn, err := NewProductConnection()
+	defer productConn.Close()
+
+	productClient := proto.NewProductServiceClient(productConn)
+
+	if err != nil {
+		log.Printf("order_handler: getorder: new product client error: err:%v", err)
+		return nil, err
+	}
+
+	order, err := h.repo.GetOrderByID(ctx, userID, req.Id, productClient)
 	if err != nil {
 		return nil, err
 	}
@@ -109,4 +127,54 @@ func (h *OrderHandler) GetOrderById(ctx context.Context, req *proto.OrderRequest
 		Product:    products,
 		TotalPrice: order.TotalPrice,
 	}, nil
+}
+
+func (h *OrderHandler) UpdateQuantityMessage(products []models.Product) error {
+	message := map[string]interface{}{
+		"products": products,
+	}
+
+	messageBody, _ := json.Marshal(message)
+
+	err := h.rabbitCh.Publish(
+		"",
+		"product_quantity_after_order",
+		false,
+		false,
+		amqp.Publishing{
+			ContentType: "application/json",
+			Body:        messageBody,
+		})
+	if err != nil {
+		return fmt.Errorf("Error publishing message: %s", err)
+	}
+
+	return nil
+}
+
+func (h *OrderHandler) SendNotification(userID, orderID int64) error {
+	message := map[string]interface{}{
+		"user_id":  userID,
+		"order_id": orderID,
+		"author":   "OrderService",
+		"subject":  "New Order!",
+		"content":  fmt.Sprintf("Hello!\n\nYour order #%v was created successfuly.\n\nThank you!", orderID),
+	}
+
+	messageBody, _ := json.Marshal(message)
+
+	err := h.rabbitCh.Publish(
+		"",
+		"notification_after_order",
+		false,
+		false,
+		amqp.Publishing{
+			ContentType: "application/json",
+			Body:        messageBody,
+		})
+	if err != nil {
+		return fmt.Errorf("Error publishing message: %s", err)
+	}
+
+	return nil
 }
