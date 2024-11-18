@@ -4,7 +4,6 @@ go 1.23.0
 
 require (
 	github.com/gin-gonic/gin v1.10.0
-	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/redis/go-redis/v9 v9.7.0
 	github.com/spf13/viper v1.19.0
@@ -12,6 +11,7 @@ require (
 	golang.org/x/crypto v0.28.0
 	google.golang.org/grpc v1.67.1
 	google.golang.org/protobuf v1.34.2
+	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 )
 
 require (
@@ -64,7 +64,6 @@ require (
 	golang.org/x/text v0.19.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240814211410-ddb44dafa142 // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
-	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
