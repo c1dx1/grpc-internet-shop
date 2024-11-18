@@ -31,7 +31,7 @@ type Config struct {
 }
 
 func LoadConfig() (*Config, error) {
-	viper.SetConfigFile("C:\\Users\\nikit\\Desktop\\FleetProject\\internet-shop\\shared\\config\\config.env")
+	viper.SetConfigFile("/internet-shop/shared/config/config.env")
 	err := viper.ReadInConfig()
 	if err != nil {
 		return nil, err

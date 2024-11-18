@@ -1,0 +1,118 @@
+services:
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    command: ["/api-gateway"]
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+    volumes:
+      - C:/Users/nikit/Desktop/FleetProject/internet-shop/shared/config/config.env:/internet-shop/shared/config/config.env
+
+  product-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: product-service
+    command: ["/product-service"]
+    ports:
+      - "50051:50051"
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+    volumes:
+      - C:/Users/nikit/Desktop/FleetProject/internet-shop/shared/config/config.env:/internet-shop/shared/config/config.env
+
+  user-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: user-service
+    command: ["/user-service"]
+    ports:
+      - "50054:50054"
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+    volumes:
+      - C:/Users/nikit/Desktop/FleetProject/internet-shop/shared/config/config.env:/internet-shop/shared/config/config.env
+
+  order-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: order-service
+    command: ["/order-service"]
+    ports:
+      - "50052:50052"
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+    volumes:
+      - C:/Users/nikit/Desktop/FleetProject/internet-shop/shared/config/config.env:/internet-shop/shared/config/config.env
+
+  cart-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cart-service
+    command: ["/cart-service"]
+    ports:
+      - "50053:50053"
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+    volumes:
+      - C:/Users/nikit/Desktop/FleetProject/internet-shop/shared/config/config.env:/internet-shop/shared/config/config.env
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: notification-service
+    command: ["/notification-service"]
+    ports:
+      - "50055:50055"
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+    volumes:
+      - C:/Users/nikit/Desktop/FleetProject/internet-shop/shared/config/config.env:/internet-shop/shared/config/config.env
+
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: shop_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    container_name: redis
+    ports:
+      - "6379:6379"
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+volumes:
+  postgres_data:
